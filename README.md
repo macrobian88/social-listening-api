@@ -1,6 +1,14 @@
 # Social Listening Lead Generation API
 
-A flexible, extensible API for monitoring social platforms (Reddit, Hacker News, etc.) to identify potential leads with buying intent.
+A flexible, extensible API for monitoring social platforms (Reddit, Hacker News, etc.) to identify potential leads with buying intent. **Now with AI-powered intent scoring using GPT-4o-mini!**
+
+## ✨ Features
+
+- 🔍 **Multi-Platform Search**: Reddit, Hacker News (more coming)
+- 🤖 **AI Intent Scoring**: GPT-4o-mini analyzes posts for buying signals
+- 🎯 **Smart Relevance**: Keyword, intent, pain point, and competitor detection
+- 🔌 **Extensible**: Easy adapter pattern to add new platforms
+- 💰 **Cost-Effective**: Uses GPT-4o-mini (~$0.15/1M input tokens)
 
 ## 🚀 Quick Start
 
@@ -8,281 +16,275 @@ A flexible, extensible API for monitoring social platforms (Reddit, Hacker News,
 # Install dependencies
 npm install
 
+# Configure (required for AI scoring)
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+
 # Start server
 npm start
-
-# Or with auto-reload for development
-npm run dev
 ```
 
 Server runs at `http://localhost:3000`
 
-## 📡 API Endpoints
+## 🤖 AI Intent Scoring
 
-### List Platforms
-```bash
-curl http://localhost:3000/api/platforms
-```
+The killer feature! GPT-4o-mini analyzes each post and returns:
 
-### Search Reddit Only
-```bash
-curl -X POST http://localhost:3000/api/search/reddit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "keywords": ["CRM", "sales tool"],
-    "intentKeywords": ["looking for", "need a", "recommend"],
-    "platformFilters": {
-      "reddit": {
-        "subreddits": ["SaaS", "startups", "smallbusiness"],
-        "timeFilter": "week",
-        "minScore": 3
-      }
-    },
-    "maxResults": 20
-  }'
-```
+| Field | Description |
+|-------|-------------|
+| `score` | 0-100 buying intent score |
+| `level` | HIGH, MEDIUM, LOW, NONE |
+| `confidence` | 0.0-1.0 confidence in assessment |
+| `buyingSignals` | Detected buying indicators |
+| `painPoints` | Extracted pain points |
+| `urgency` | IMMEDIATE, SHORT_TERM, EXPLORING, NONE |
+| `recommendedAction` | CONTACT_NOW, NURTURE, MONITOR, SKIP |
+| `summary` | One-sentence opportunity summary |
 
-### Search All Platforms
+### Example: Find HubSpot Alternative Seekers
+
 ```bash
-curl -X POST http://localhost:3000/api/search \
+curl -X POST http://localhost:3000/api/search/ai \
   -H "Content-Type: application/json" \
   -d '{
     "criteria": {
-      "keywords": ["CRM", "sales automation"],
-      "intentKeywords": ["looking for", "need a", "alternative to"],
-      "painKeywords": ["frustrated", "expensive", "complex"],
-      "competitors": ["Salesforce", "HubSpot"],
-      "maxResults": 25
-    },
-    "platforms": ["reddit", "hackernews"]
-  }'
-```
-
-### Get Ranked Results (Merged & Sorted)
-```bash
-curl -X POST http://localhost:3000/api/search/ranked \
-  -H "Content-Type: application/json" \
-  -d '{
-    "criteria": {
-      "keywords": ["project management", "task tracking"],
-      "intentKeywords": ["switching from", "looking for"],
-      "competitors": ["Asana", "Monday", "Jira"],
+      "keywords": ["CRM", "marketing automation", "sales software"],
+      "intentKeywords": ["alternative to", "switching from", "replacing", "looking for"],
+      "painKeywords": ["too expensive", "complex", "frustrated", "overkill"],
+      "competitors": ["HubSpot", "Hubspot"],
+      "platformFilters": {
+        "reddit": {
+          "subreddits": ["SaaS", "startups", "Entrepreneur", "smallbusiness"],
+          "timeFilter": "month",
+          "minScore": 3
+        }
+      },
       "maxResults": 30
+    },
+    "platforms": ["reddit", "hackernews"],
+    "aiOptions": {
+      "productContext": {
+        "productName": "MyCRM",
+        "productType": "Simple CRM for SMBs",
+        "problemsSolved": ["lead management", "sales pipeline", "contact tracking"],
+        "competitors": ["HubSpot", "Salesforce", "Pipedrive"]
+      },
+      "minRelevanceScore": 30,
+      "maxToScore": 20
     }
   }'
 ```
+
+### AI Response Example
+
+```json
+{
+  "success": true,
+  "data": {
+    "posts": [...],
+    "hotLeads": [
+      {
+        "id": "abc123",
+        "platform": "reddit",
+        "title": "HubSpot is way too expensive for my 5-person startup. What else?",
+        "subreddit": "startups",
+        "intentAnalysis": {
+          "score": 92,
+          "level": "HIGH",
+          "confidence": 0.95,
+          "buyingSignals": [
+            "Actively seeking alternatives",
+            "Mentions team size (budget context)",
+            "Asking for recommendations"
+          ],
+          "painPoints": [
+            "Cost/pricing concerns",
+            "Feature bloat for small team"
+          ],
+          "urgency": "SHORT_TERM",
+          "recommendedAction": "CONTACT_NOW",
+          "summary": "Small startup founder actively looking for affordable HubSpot alternative - high conversion potential"
+        }
+      }
+    ],
+    "byIntentLevel": {
+      "HIGH": 3,
+      "MEDIUM": 8,
+      "LOW": 5,
+      "NONE": 2,
+      "UNSCORED": 12
+    },
+    "aiScoring": {
+      "enabled": true,
+      "model": "gpt-4o-mini",
+      "scored": 18,
+      "skipped": 12
+    }
+  }
+}
+```
+
+## 📡 API Endpoints
+
+### GET /api/platforms
+List available platforms and AI status.
+
+### POST /api/search
+Basic multi-platform search (no AI scoring).
+
+### POST /api/search/ranked
+Search with keyword-based relevance ranking.
+
+### POST /api/search/ai 🤖
+**Search with AI intent scoring** - the main endpoint!
+
+### POST /api/search/:platform
+Search a specific platform.
 
 ## 📋 Search Criteria
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `keywords` | string[] | ✅ Yes | Main search terms |
-| `intentKeywords` | string[] | No | Buying signals: "looking for", "need a", "recommend" |
-| `painKeywords` | string[] | No | Pain indicators: "frustrated", "expensive", "manual" |
-| `competitors` | string[] | No | Competitor names to detect |
+| `intentKeywords` | string[] | No | Buying signals |
+| `painKeywords` | string[] | No | Pain indicators |
+| `competitors` | string[] | No | Competitor names |
 | `platformFilters` | object | No | Platform-specific settings |
-| `timeRange` | object | No | `{ "preset": "week" }` or `{ "from": "...", "to": "..." }` |
-| `maxResults` | number | No | Max results per platform (default: 25) |
+| `maxResults` | number | No | Max results (default: 25) |
 
-### Platform Filters
+## 🎯 AI Options
 
-**Reddit:**
-```json
-{
-  "reddit": {
-    "subreddits": ["SaaS", "startups"],
-    "sortBy": "relevance",
-    "timeFilter": "week",
-    "minScore": 5
-  }
-}
-```
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `productContext.productName` | string | - | Your product name |
+| `productContext.productType` | string | - | What your product is |
+| `productContext.problemsSolved` | string[] | - | Problems you solve |
+| `productContext.competitors` | string[] | - | Your competitors |
+| `minRelevanceScore` | number | 30 | Min keyword score to AI-score |
+| `maxToScore` | number | 20 | Max posts to send to AI |
 
-**Hacker News:**
-```json
-{
-  "hackerNews": {
-    "sortBy": "relevance",
-    "storyType": "ask_hn",
-    "minPoints": 10
-  }
-}
-```
+## 💡 Search Strategy Tips
 
-## 📊 Response Format
+### For finding competitor churners:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "posts": [
-      {
-        "id": "abc123",
-        "platform": "reddit",
-        "title": "Looking for a simple CRM for my startup",
-        "body": "We've been using spreadsheets but it's getting painful...",
-        "url": "https://reddit.com/r/startups/...",
-        "author": {
-          "username": "founder123",
-          "profileUrl": "https://reddit.com/user/founder123"
-        },
-        "metrics": {
-          "score": 42,
-          "comments": 28
-        },
-        "subreddit": "startups",
-        "signals": {
-          "matchedKeywords": ["CRM"],
-          "matchedIntentKeywords": ["looking for"],
-          "matchedPainKeywords": ["spreadsheets"],
-          "matchedCompetitors": [],
-          "relevanceScore": 72
-        }
-      }
-    ],
-    "totalFound": 15,
-    "byPlatform": {
-      "reddit": 10,
-      "hackernews": 5
-    }
-  }
+  "intentKeywords": [
+    "alternative to", "switching from", "leaving", 
+    "canceling", "replacing", "migrating from"
+  ],
+  "painKeywords": [
+    "too expensive", "overpriced", "complex", "bloated",
+    "frustrating", "hate", "terrible support"
+  ]
 }
 ```
 
-## 🔌 Adding a New Platform
+### For finding active buyers:
 
-The architecture makes it trivial to add new platforms. Here's how:
-
-### 1. Create the Adapter
-
-Create `src/adapters/stackoverflow.adapter.js`:
-
-```javascript
-const axios = require('axios');
-const { BasePlatformAdapter } = require('./base.adapter');
-
-class StackOverflowAdapter extends BasePlatformAdapter {
-  constructor() {
-    super();
-    this.client = axios.create({
-      baseURL: 'https://api.stackexchange.com/2.3',
-      timeout: 10000
-    });
-  }
-
-  get platform() { return 'stackoverflow'; }
-  get displayName() { return 'Stack Overflow'; }
-  get rateLimitPerMinute() { return 30; }
-
-  async search(criteria) {
-    try {
-      await this.checkRateLimit();
-      
-      const query = this.buildQuery(criteria);
-      const response = await this.client.get('/search', {
-        params: {
-          intitle: query,
-          site: 'stackoverflow',
-          sort: 'relevance'
-        }
-      });
-
-      const posts = response.data.items.map(item => {
-        const normalized = this.normalizePost(item);
-        normalized.signals = this.detectSignals(normalized, criteria);
-        return normalized;
-      });
-
-      return this.successResult(criteria, posts);
-      
-    } catch (error) {
-      return this.errorResult(criteria, error);
-    }
-  }
-
-  buildQuery(criteria) {
-    return criteria.keywords.join(' ');
-  }
-
-  normalizePost(item) {
-    return {
-      id: item.question_id.toString(),
-      platform: 'stackoverflow',
-      title: item.title,
-      body: item.body || '',
-      url: item.link,
-      author: {
-        username: item.owner.display_name,
-        profileUrl: item.owner.link
-      },
-      metrics: {
-        score: item.score,
-        views: item.view_count,
-        answers: item.answer_count
-      },
-      tags: item.tags,
-      createdAt: new Date(item.creation_date * 1000).toISOString()
-    };
-  }
+```json
+{
+  "intentKeywords": [
+    "looking for", "need a", "recommend", "best tool",
+    "what do you use", "suggestions for"
+  ]
 }
-
-module.exports = { StackOverflowAdapter };
 ```
 
-### 2. Register the Adapter
+### For finding urgency:
 
-Edit `src/adapters/index.js`:
-
-```javascript
-const { RedditAdapter } = require('./reddit.adapter');
-const { HackerNewsAdapter } = require('./hackernews.adapter');
-const { StackOverflowAdapter } = require('./stackoverflow.adapter'); // Add this
-
-const adapters = {
-  reddit: new RedditAdapter(),
-  hackernews: new HackerNewsAdapter(),
-  stackoverflow: new StackOverflowAdapter(), // Add this
-};
+```json
+{
+  "intentKeywords": [
+    "ASAP", "urgent", "this week", "before launch",
+    "immediately", "right now"
+  ]
+}
 ```
-
-**That's it!** The new platform is now available at:
-- `POST /api/search/stackoverflow`
-- Automatically included in `/api/search` and `/api/search/ranked`
 
 ## 📁 Project Structure
 
 ```
 src/
 ├── adapters/
-│   ├── base.adapter.js      # Base class (extend this)
-│   ├── reddit.adapter.js    # Reddit implementation
-│   ├── hackernews.adapter.js # HN implementation
-│   └── index.js             # Adapter registry
-├── search.service.js        # Search orchestration
-└── index.js                 # Express API
+│   ├── base.adapter.js         # Base class (extend this)
+│   ├── reddit.adapter.js       # Reddit implementation
+│   ├── hackernews.adapter.js   # HN implementation
+│   └── index.js                # Adapter registry
+├── services/
+│   └── intent.service.js       # 🤖 GPT-4o-mini scoring
+├── search.service.js           # Search orchestration
+└── index.js                    # Express API
 ```
 
-## 🎯 Relevance Scoring
+## 🔌 Adding a New Platform
 
-Posts are automatically scored 0-100:
+1. Create `src/adapters/myplatform.adapter.js`:
 
-| Signal | Points | Description |
-|--------|--------|-------------|
-| Keyword matches | Up to 40 | Based on % of keywords found |
-| Intent keywords | Up to 25 | "looking for", "need a" = strong signal |
-| Pain keywords | Up to 20 | "frustrated", "expensive" = active problem |
-| Competitor mentions | Up to 15 | Highest intent signal |
+```javascript
+const { BasePlatformAdapter } = require('./base.adapter');
+
+class MyPlatformAdapter extends BasePlatformAdapter {
+  get platform() { return 'myplatform'; }
+  get displayName() { return 'My Platform'; }
+  
+  async search(criteria) {
+    // Your implementation
+  }
+  
+  normalizePost(item) {
+    // Normalize to standard format
+  }
+}
+
+module.exports = { MyPlatformAdapter };
+```
+
+2. Register in `src/adapters/index.js`:
+
+```javascript
+const { MyPlatformAdapter } = require('./myplatform.adapter');
+
+const adapters = {
+  reddit: new RedditAdapter(),
+  hackernews: new HackerNewsAdapter(),
+  myplatform: new MyPlatformAdapter(), // Add here
+};
+```
+
+Done! The new platform is automatically available.
+
+## 💰 Cost Estimation
+
+Using GPT-4o-mini:
+- Input: ~$0.15 per 1M tokens
+- Output: ~$0.60 per 1M tokens
+
+**Typical usage:**
+- ~500 tokens per post analysis
+- 20 posts scored = ~10K tokens = ~$0.002
+
+Very cost-effective for lead generation!
 
 ## 🔮 Roadmap
 
 - [x] Reddit adapter
-- [x] Hacker News adapter  
+- [x] Hacker News adapter
+- [x] AI intent scoring (GPT-4o-mini)
 - [ ] Stack Overflow adapter
-- [ ] GitHub Discussions adapter
-- [ ] AI intent scoring (GPT-4o-mini)
 - [ ] Frappe CRM integration
-- [ ] Redis caching/dedup
 - [ ] Slack/email notifications
+- [ ] Redis caching/dedup
+- [ ] Scheduled monitoring jobs
+
+## 📝 Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | Server port (default: 3000) |
+| `OPENAI_API_KEY` | For AI | OpenAI API key |
+| `OPENAI_MODEL` | No | Model to use (default: gpt-4o-mini) |
+| `REDDIT_USER_AGENT` | No | Reddit API user agent |
 
 ## 📝 License
 
