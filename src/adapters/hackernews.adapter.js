@@ -20,7 +20,7 @@ class HackerNewsAdapter extends BasePlatformAdapter {
 
   get platform() { return 'hackernews'; }
   get displayName() { return 'Hacker News'; }
-  get rateLimitPerMinute() { return 100; }
+  get rateLimitPerMinute() { return 100; } // Algolia is generous
 
   /**
    * Search Hacker News
@@ -33,7 +33,10 @@ class HackerNewsAdapter extends BasePlatformAdapter {
       const maxResults = criteria.maxResults || 25;
       const query = this.buildQuery(criteria);
 
+      // Choose endpoint: search (relevance) or search_by_date
       const endpoint = filters.sortBy === 'date' ? '/search_by_date' : '/search';
+      
+      // Build filters
       const tags = this.buildTags(filters);
       const numericFilters = this.buildNumericFilters(filters, criteria.timeRange);
 
@@ -64,40 +67,83 @@ class HackerNewsAdapter extends BasePlatformAdapter {
     }
   }
 
+  /**
+   * Build search query
+   */
   buildQuery(criteria) {
     const parts = [];
-    if (criteria.keywords?.length) parts.push(...criteria.keywords);
-    if (criteria.intentKeywords?.length) parts.push(...criteria.intentKeywords.slice(0, 2));
-    if (criteria.competitors?.length) parts.push(...criteria.competitors.slice(0, 2));
+    
+    if (criteria.keywords?.length) {
+      parts.push(...criteria.keywords);
+    }
+    
+    if (criteria.intentKeywords?.length) {
+      parts.push(...criteria.intentKeywords.slice(0, 2));
+    }
+    
+    if (criteria.competitors?.length) {
+      parts.push(...criteria.competitors.slice(0, 2));
+    }
+    
     return parts.join(' ');
   }
 
+  /**
+   * Build tags filter for story type
+   */
   buildTags(filters) {
     switch (filters.storyType) {
       case 'story': return 'story';
       case 'comment': return 'comment';
       case 'ask_hn': return 'ask_hn';
       case 'show_hn': return 'show_hn';
-      default: return '(story,ask_hn,show_hn)';
+      default: return '(story,ask_hn,show_hn)'; // Best for finding leads
     }
   }
 
+  /**
+   * Build numeric filters
+   */
   buildNumericFilters(filters, timeRange) {
     const parts = [];
-    if (filters.minPoints > 0) parts.push(`points>=${filters.minPoints}`);
     
+    // Minimum points
+    if (filters.minPoints > 0) {
+      parts.push(`points>=${filters.minPoints}`);
+    }
+    
+    // Time range
     if (timeRange) {
       const now = Math.floor(Date.now() / 1000);
-      const presets = { hour: 3600, day: 86400, week: 604800, month: 2592000, year: 31536000 };
-      let fromTs = timeRange.preset 
-        ? now - (presets[timeRange.preset] || presets.week)
-        : timeRange.from ? Math.floor(new Date(timeRange.from).getTime() / 1000) : now - presets.week;
+      const presets = {
+        hour: 3600,
+        day: 86400,
+        week: 604800,
+        month: 2592000,
+        year: 31536000
+      };
+      
+      let fromTs;
+      if (timeRange.preset) {
+        fromTs = now - (presets[timeRange.preset] || presets.week);
+      } else if (timeRange.from) {
+        fromTs = Math.floor(new Date(timeRange.from).getTime() / 1000);
+      } else {
+        fromTs = now - presets.week;
+      }
+      
       parts.push(`created_at_i>${fromTs}`);
     }
+    
     return parts.join(',');
   }
 
+  /**
+   * Normalize HN post to standard format
+   */
   normalizePost(hit) {
+    const isComment = hit._tags?.includes('comment');
+    
     return {
       id: hit.objectID,
       platform: 'hackernews',
@@ -108,7 +154,10 @@ class HackerNewsAdapter extends BasePlatformAdapter {
         username: hit.author,
         profileUrl: `https://news.ycombinator.com/user?id=${hit.author}`
       },
-      metrics: { score: hit.points || 0, comments: hit.num_comments || 0 },
+      metrics: {
+        score: hit.points || 0,
+        comments: hit.num_comments || 0
+      },
       createdAt: hit.created_at,
       storyType: this.getStoryType(hit._tags)
     };

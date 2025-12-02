@@ -1,4 +1,4 @@
-const { getAdapter, getPlatformNames, getPlatformInfo } = require('./adapters');
+const { getAdapter, getAllAdapters, getPlatformNames, getPlatformInfo } = require('./adapters');
 
 /**
  * Search Service
@@ -8,6 +8,9 @@ const { getAdapter, getPlatformNames, getPlatformInfo } = require('./adapters');
  */
 class SearchService {
   
+  /**
+   * Search across specified platforms (or all if not specified)
+   */
   async search(criteria, platforms = null) {
     const targetPlatforms = platforms || getPlatformNames();
     
@@ -17,6 +20,7 @@ class SearchService {
     const results = [];
     const errors = [];
 
+    // Search each platform in parallel
     const searchPromises = targetPlatforms.map(async (platform) => {
       const adapter = getAdapter(platform);
       
@@ -26,7 +30,8 @@ class SearchService {
       }
 
       try {
-        return await adapter.search(criteria);
+        const result = await adapter.search(criteria);
+        return result;
       } catch (error) {
         errors.push({ platform, error: error.message });
         return null;
@@ -35,11 +40,13 @@ class SearchService {
 
     const searchResults = await Promise.all(searchPromises);
     
+    // Collect successful results
     for (const result of searchResults) {
       if (result) results.push(result);
     }
 
     const totalPosts = results.reduce((sum, r) => sum + r.posts.length, 0);
+    
     console.log(`✅ Search complete: ${totalPosts} posts from ${results.length} platforms\n`);
 
     return {
@@ -52,9 +59,13 @@ class SearchService {
     };
   }
 
+  /**
+   * Search and return merged, ranked results
+   */
   async searchRanked(criteria, platforms = null) {
     const result = await this.search(criteria, platforms);
     
+    // Merge all posts
     const allPosts = [];
     const byPlatform = {};
     
@@ -63,8 +74,14 @@ class SearchService {
       byPlatform[platformResult.platform] = platformResult.posts.length;
     }
 
-    allPosts.sort((a, b) => (b.signals?.relevanceScore || 0) - (a.signals?.relevanceScore || 0));
+    // Sort by relevance score (highest first)
+    allPosts.sort((a, b) => {
+      const scoreA = a.signals?.relevanceScore || 0;
+      const scoreB = b.signals?.relevanceScore || 0;
+      return scoreB - scoreA;
+    });
 
+    // Apply maxResults limit
     const limitedPosts = criteria.maxResults 
       ? allPosts.slice(0, criteria.maxResults)
       : allPosts;
@@ -78,16 +95,27 @@ class SearchService {
     };
   }
 
+  /**
+   * Search a single platform
+   */
   async searchPlatform(criteria, platform) {
     const adapter = getAdapter(platform);
     
     if (!adapter) {
-      return { success: false, platform, posts: [], error: `Unknown platform: ${platform}` };
+      return {
+        success: false,
+        platform,
+        posts: [],
+        error: `Unknown platform: ${platform}`
+      };
     }
 
     return adapter.search(criteria);
   }
 
+  /**
+   * Get available platforms
+   */
   getPlatforms() {
     return getPlatformInfo();
   }

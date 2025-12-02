@@ -150,8 +150,11 @@ class RedditAdapter extends BasePlatformAdapter {
     return response.data.children
       .filter(item => {
         const post = item.data;
+        // Filter by score
         if (post.score < minScore) return false;
+        // Skip stickied/mod posts
         if (post.stickied || post.distinguished) return false;
+        // Skip NSFW
         if (post.over_18) return false;
         return true;
       })
@@ -160,6 +163,7 @@ class RedditAdapter extends BasePlatformAdapter {
         normalized.signals = this.detectSignals(normalized, criteria);
         return normalized;
       })
+      // Only return posts with some relevance
       .filter(post => post.signals.relevanceScore > 0);
   }
 

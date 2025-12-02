@@ -23,18 +23,30 @@ const adapters = {
   // producthunt: new ProductHuntAdapter(),
 };
 
+/**
+ * Get an adapter by platform name
+ */
 function getAdapter(platform) {
   return adapters[platform];
 }
 
+/**
+ * Get all registered adapters
+ */
 function getAllAdapters() {
   return Object.values(adapters);
 }
 
+/**
+ * Get all platform names
+ */
 function getPlatformNames() {
   return Object.keys(adapters);
 }
 
+/**
+ * Get platform info for API response
+ */
 function getPlatformInfo() {
   return Object.entries(adapters).map(([name, adapter]) => ({
     platform: name,

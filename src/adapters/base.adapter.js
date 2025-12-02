@@ -23,6 +23,8 @@ class BasePlatformAdapter {
 
   /**
    * Main search method - must be implemented by each platform
+   * @param {SearchCriteria} criteria 
+   * @returns {Promise<SearchResult>}
    */
   async search(criteria) {
     throw new Error('search() must be implemented');
